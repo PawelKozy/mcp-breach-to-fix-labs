@@ -5,7 +5,7 @@ Hands-on lab of ten Model Context Protocol (MCP) challenges reproduced from real
 - **Vulnerable** - intentionally exploitable implementation you can reproduce end-to-end in Cursor/Codex.
 - **Secure** - minimal fix focusing on the specific control the incident highlighted (not a "perfect" rewrite).
 
-Unlike typical AI security posts that stop at theory, these labs were battle-tested with Claude and Cursor so you can replay the exact exploit/mitigation flow.
+These labs were fully battle-tested with Claude/Cursor, ensuring the exact exploit/mitigation flow is reproducible.
 
 Each challenge includes Docker services, FastMCP servers, fixtures, pytest regressions, and screenshots that prove the exploit really runs-no theoretical write-ups.
 
