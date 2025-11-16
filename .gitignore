@@ -1,0 +1,22 @@
+# Python caches
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Local tooling artifacts
+.DS_Store
+.idea/
+.vscode/
+
+# Docker build artifacts
+*.log
+
+# OS cruft
+Thumbs.db
+

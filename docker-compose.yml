@@ -1,0 +1,184 @@
+version: "3.9"
+
+services:
+  challenge-01-vulnerable:
+    build:
+      context: ./challenges/01-Asana-crm-confused-deputy
+      dockerfile: vulnerable/Dockerfile
+    ports:
+      - "8001:8000"
+
+  challenge-01-secure:
+    build:
+      context: ./challenges/01-Asana-crm-confused-deputy
+      dockerfile: secure/Dockerfile
+    ports:
+      - "9001:8000"
+
+  filesystem-bypass-prefix-vulnerable:
+    build:
+      context: ./challenges/02-filesystem-prefix-bypass-cve-2025-53110/vulnerable
+    volumes:
+      - ./challenges/02-filesystem-prefix-bypass-cve-2025-53110/files:/app/files:ro
+    ports:
+      - "8002:8000"
+
+  filesystem-bypass-prefix-secure:
+    build:
+      context: ./challenges/02-filesystem-prefix-bypass-cve-2025-53110/secure
+    volumes:
+      - ./challenges/02-filesystem-prefix-bypass-cve-2025-53110/files:/app/files:ro
+    ports:
+      - "9002:8000"
+
+  log-poisoning-incident-vulnerable:
+    build:
+      context: ./challenges/06-log-poisoning-incident-response
+      dockerfile: vulnerable/Dockerfile
+    volumes:
+      - ./challenges/06-log-poisoning-incident-response/data:/app/data
+      - ./challenges/06-log-poisoning-incident-response/assets:/app/assets:ro
+    ports:
+      - "8006:8000"
+
+  log-poisoning-incident-secure:
+    build:
+      context: ./challenges/06-log-poisoning-incident-response
+      dockerfile: secure/Dockerfile
+    volumes:
+      - ./challenges/06-log-poisoning-incident-response/data:/app/data
+      - ./challenges/06-log-poisoning-incident-response/assets:/app/assets:ro
+    ports:
+      - "9006:8000"
+
+  news-prompt-exfiltration-vulnerable:
+    build:
+      context: ./challenges/05-news-prompt-exfiltration
+      dockerfile: vulnerable/Dockerfile
+    volumes:
+      - ./challenges/05-news-prompt-exfiltration/data:/app/data
+      - ./challenges/05-news-prompt-exfiltration/assets:/app/assets:ro
+    ports:
+      - "8005:8000"
+
+  news-prompt-exfiltration-secure:
+    build:
+      context: ./challenges/05-news-prompt-exfiltration
+      dockerfile: secure/Dockerfile
+    volumes:
+      - ./challenges/05-news-prompt-exfiltration/data:/app/data
+      - ./challenges/05-news-prompt-exfiltration/assets:/app/assets:ro
+    ports:
+      - "9005:8000"
+
+  sql-stored-prompt-vulnerable:
+    build:
+      context: ./challenges/07-classic-sql-injection-stored-prompt/vulnerable
+    ports:
+      - "9007:8000"
+
+  sql-stored-prompt-secure:
+    build:
+      context: ./challenges/07-classic-sql-injection-stored-prompt/secure
+    ports:
+      - "9907:8000"
+
+  git-command-injection-vulnerable:
+    build:
+      context: ./challenges/08-git-command-injection-ghsa-3q26-f695-pp76
+      dockerfile: vulnerable/Dockerfile
+    volumes:
+      - ./challenges/08-git-command-injection-ghsa-3q26-f695-pp76/secrets:/app/secrets:ro
+    ports:
+      - "8008:8000"
+
+  git-command-injection-secure:
+    build:
+      context: ./challenges/08-git-command-injection-ghsa-3q26-f695-pp76
+      dockerfile: secure/Dockerfile
+    volumes:
+      - ./challenges/08-git-command-injection-ghsa-3q26-f695-pp76/secrets:/app/secrets:ro
+    ports:
+      - "9008:8000"
+
+  github-public-issue-vulnerable:
+    build:
+      context: ./challenges/09-github-public-issue-injection
+      dockerfile: vulnerable/Dockerfile
+    ports:
+      - "8009:8000"
+
+  github-public-issue-secure:
+    build:
+      context: ./challenges/09-github-public-issue-injection
+      dockerfile: secure/Dockerfile
+    ports:
+      - "9009:8000"
+
+  whatsapp-rug-helper:
+    build:
+      context: ./challenges/03-whatsapp-rug-pull
+      dockerfile: helper/Dockerfile
+    ports:
+      - "8003:8000"
+
+  whatsapp-rug-whatsapp-vulnerable:
+    build:
+      context: ./challenges/03-whatsapp-rug-pull
+      dockerfile: whatsapp/vulnerable/Dockerfile
+    ports:
+      - "8004:8000"
+
+  whatsapp-rug-whatsapp-secure:
+    build:
+      context: ./challenges/03-whatsapp-rug-pull
+      dockerfile: whatsapp/secure/Dockerfile
+    ports:
+      - "9004:8000"
+
+  challenge-10-vulnerable:
+    build:
+      context: ./challenges/10-regex-dos
+      dockerfile: vulnerable/Dockerfile
+    ports:
+      - "8010:8000"
+
+  challenge-10-secure:
+    build:
+      context: ./challenges/10-regex-dos
+      dockerfile: secure/Dockerfile
+    ports:
+      - "9010:8000"
+
+  xata-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: mcp
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: xata
+    ports:
+      - "5440:5432"
+    volumes:
+      - ./challenges/04-xata-readonly-bypass/db/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+
+  xata-readonly-bypass-vulnerable:
+    build:
+      context: ./challenges/04-xata-readonly-bypass
+      dockerfile: vulnerable/Dockerfile
+    environment:
+      PG_DSN: postgresql://mcp:password@xata-db:5432/xata
+    depends_on:
+      - xata-db
+    ports:
+      - "8020:8000"
+
+  xata-readonly-bypass-secure:
+    build:
+      context: ./challenges/04-xata-readonly-bypass
+      dockerfile: secure/Dockerfile
+    environment:
+      PG_DSN: postgresql://mcp:password@xata-db:5432/xata
+    depends_on:
+      - xata-db
+    ports:
+      - "9020:8000"
