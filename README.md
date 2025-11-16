@@ -1,6 +1,6 @@
 ﻿# MCP Incident Lab
 
-Hands-on lab of ten Model Context Protocol (MCP) challenges reproduced from real CVEs and public incident reports. I’ve run every exploit end-to-end with Cursor/Codex and Claude, so the steps aren’t theoretical—they’re the exact tool calls the assistants followed. Every scenario ships in two modes:
+Hands-on lab of ten Model Context Protocol (MCP) challenges reproduced from real CVEs and public incident reports. I’ve run every exploit end-to-end with Cursor, so the steps aren’t theoretical—they’re the exact tool calls the assistants followed. Every scenario ships in two modes:
 
 - **Vulnerable** - intentionally exploitable implementation you can reproduce end-to-end in Cursor/Codex.
 - **Secure** - minimal fix focusing on the specific control the incident highlighted (not a "perfect" rewrite).
