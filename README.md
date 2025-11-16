@@ -41,10 +41,10 @@ Every challenge registers two services in `docker-compose.yml` named `challenge-
 
 ```bash
 # vulnerable CRM proxy on http://localhost:8001/mcp/stream
-docker compose up challenge-01-vulnerable
+docker compose up filesystem-bypass-prefix-vulnerable
 
 # hardened build on http://localhost:9001/mcp/stream
-docker compose up challenge-01-secure
+docker compose up filesystem-bypass-prefix-secure
 ```
 
 Swap `<nn>` to launch other scenarios. Compose images are lightweight (`python:3.10-slim`) and self-contained.
