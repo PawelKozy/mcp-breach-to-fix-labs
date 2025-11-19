@@ -1,11 +1,11 @@
-﻿# MCP Incident Replay Lab
+﻿# MCP-breach-to-fix-labs
 
-Hands-on lab of ten Model Context Protocol (MCP) challenges reproduced from real CVEs and public incident reports. I’ve run every exploit end-to-end with Cursor/Codex and Claude, so the steps aren’t theoretical—they’re the exact tool calls the assistants followed. Every scenario ships in two modes:
+Hands-on lab of ten Model Context Protocol (MCP) challenges reproduced from real CVEs and public incident reports. I’ve run every exploit end-to-end with Cursor, so the steps aren’t theoretical—they’re the exact tool calls the assistants followed. Every scenario ships in two modes:
 
 - **Vulnerable** - intentionally exploitable implementation you can reproduce end-to-end in Cursor/Codex.
 - **Secure** - minimal fix focusing on the specific control the incident highlighted (not a "perfect" rewrite).
 
-Unlike typical AI security posts that stop at theory, these labs were battle-tested with Claude and Cursor so you can replay the exact exploit/mitigation flow.
+These labs were fully battle-tested with Claude/Cursor, ensuring the exact exploit/mitigation flow is reproducible.
 
 Each challenge includes Docker services, FastMCP servers, fixtures, pytest regressions, and screenshots that prove the exploit really runs-no theoretical write-ups.
 
@@ -41,10 +41,10 @@ Every challenge registers two services in `docker-compose.yml` named `challenge-
 
 ```bash
 # vulnerable CRM proxy on http://localhost:8001/mcp/stream
-docker compose up challenge-01-vulnerable
+docker compose up filesystem-bypass-prefix-vulnerable
 
 # hardened build on http://localhost:9001/mcp/stream
-docker compose up challenge-01-secure
+docker compose up filesystem-bypass-prefix-secure
 ```
 
 Swap `<nn>` to launch other scenarios. Compose images are lightweight (`python:3.10-slim`) and self-contained.
