@@ -73,7 +73,12 @@ def _rows_to_summary(rows: List[Tuple[str, str]]) -> str:
     return f"Tickets ({len(rows)}):\n{formatted}"
 
 
-init_db()
+# Database should be created on first run
+if not DB_PATH.exists():
+    log.info("Initializing database at %s", DB_PATH)
+    init_db()
+else:
+    log.info("Using existing database at %s", DB_PATH)
 
 
 @mcp.tool()

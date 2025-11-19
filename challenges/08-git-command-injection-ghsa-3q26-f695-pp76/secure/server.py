@@ -17,7 +17,9 @@ INSTRUCTIONS = (
     "invokes git with safe argument lists to block command injection."
 )
 REPO_ROOT = Path(os.environ.get("CH08_REPO_ROOT", Path(__file__).resolve().parent / "repos"))
-SAFE_REPO_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
+# Remove dots to prevent path traversal; only allow alphanumeric, underscore, dash
+SAFE_REPO_NAME = re.compile(r"^[A-Za-z0-9_-]+$")
+MAX_REPO_NAME_LENGTH = 100
 
 log = logging.getLogger("challenge08.secure")
 
@@ -34,9 +36,35 @@ def _ensure_repo_root() -> None:
 
 
 def _sanitize_repo_name(repo_name: str) -> Path:
+    """Validate and sanitize repository name to prevent command injection and path traversal."""
+    # Input validation
+    if not repo_name or not repo_name.strip():
+        raise ValueError("Repository name cannot be empty")
+    
+    if len(repo_name) > MAX_REPO_NAME_LENGTH:
+        raise ValueError(f"Repository name too long (max {MAX_REPO_NAME_LENGTH} characters)")
+    
+    # Pattern validation (no shell metacharacters, no dots for traversal)
     if not SAFE_REPO_NAME.fullmatch(repo_name):
-        raise ValueError("Invalid repository name. Use letters, numbers, dots, underscores, or dashes.")
-    return REPO_ROOT / repo_name
+        raise ValueError(
+            "Invalid repository name. Use only letters, numbers, underscores, or dashes."
+        )
+    
+    # Path traversal prevention - ensure resolved path stays under REPO_ROOT
+    target = REPO_ROOT / repo_name
+    try:
+        resolved = target.resolve()
+        repo_root_resolved = REPO_ROOT.resolve()
+        
+        # Check if resolved path is actually under REPO_ROOT
+        if not resolved.is_relative_to(repo_root_resolved):
+            log.warning("SECURITY: Path traversal attempt blocked: %s", repo_name)
+            raise ValueError("Path traversal detected")
+    except (ValueError, OSError) as e:
+        log.warning("SECURITY: Invalid repository path: %s - %s", repo_name, e)
+        raise ValueError("Invalid repository path")
+    
+    return target
 
 
 def _run_git(args: List[str]) -> subprocess.CompletedProcess[str]:
@@ -57,14 +85,40 @@ def _format_result(result: subprocess.CompletedProcess[str]) -> str:
 
 @mcp.tool()
 def init_bare_repository(repo_name: str) -> str:
-    """Initialize a bare git repo using safe subprocess invocation."""
+    """Initialize a bare git repo using safe subprocess invocation and input validation."""
     _ensure_repo_root()
     try:
         target = _sanitize_repo_name(repo_name)
     except ValueError as exc:
+        log.warning("Rejected repository creation: %s", exc)
         return str(exc)
+    
+    # Remove existing repository safely
     if target.exists():
-        shutil.rmtree(target, ignore_errors=True)
+        # Security check: ensure it's not a symlink
+        if target.is_symlink():
+            log.warning("SECURITY: Refusing to remove symlink: %s", target)
+            return "Error: Repository path is a symlink"
+        
+        # Double-check path containment before destructive operation (prevent TOCTOU)
+        try:
+            resolved = target.resolve()
+            if not resolved.is_relative_to(REPO_ROOT.resolve()):
+                log.warning("SECURITY: Path escape detected before removal: %s", target)
+                return "Error: Path validation failed"
+        except (ValueError, OSError) as e:
+            log.warning("SECURITY: Path resolution failed: %s", e)
+            return "Error: Invalid path"
+        
+        # Safe removal with error handling
+        try:
+            shutil.rmtree(target)
+            log.info("Removed existing repository: %s", repo_name)
+        except OSError as e:
+            log.error("Failed to remove existing repository %s: %s", repo_name, e)
+            return f"Error: Cannot remove existing repository: {e}"
+    
+    # Execute git with safe argument list (no shell interpolation)
     args = ["git", "init", "--bare", str(target)]
     log.info("Executing secure git command: %s", args)
     result = _run_git(args)
@@ -73,10 +127,35 @@ def init_bare_repository(repo_name: str) -> str:
 
 @mcp.tool()
 def list_repositories() -> str:
-    """List bare repositories initialized on disk."""
+    """List bare repositories with safety limits."""
     _ensure_repo_root()
-    entries: List[str] = sorted(p.name for p in REPO_ROOT.iterdir() if p.is_dir())
-    return "\n".join(entries) if entries else "No repositories yet."
+    
+    try:
+        # Only list actual directories, not symlinks (prevent symlink attacks)
+        entries = [
+            p.name
+            for p in REPO_ROOT.iterdir()
+            if p.is_dir() and not p.is_symlink()
+        ]
+        
+        if not entries:
+            return "No repositories yet."
+        
+        # Sort and limit results to prevent resource exhaustion
+        MAX_REPOS_TO_LIST = 1000
+        sorted_entries = sorted(entries)
+        
+        if len(sorted_entries) > MAX_REPOS_TO_LIST:
+            log.warning("Repository list truncated: %d total", len(sorted_entries))
+            return (
+                f"Showing first {MAX_REPOS_TO_LIST} of {len(sorted_entries)} repositories:\n"
+                + "\n".join(sorted_entries[:MAX_REPOS_TO_LIST])
+            )
+        
+        return "\n".join(sorted_entries)
+    except OSError as e:
+        log.error("Error listing repositories: %s", e)
+        return "Error: Unable to list repositories"
 
 
 if __name__ == "__main__":

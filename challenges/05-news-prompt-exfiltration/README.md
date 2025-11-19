@@ -76,19 +76,26 @@ docker compose up news-prompt-exfiltration-secure
    }
    ```
    The shared log at `data/bug_reports.json` now contains the flag, showing how a passive preview led to credential theft.
+    ![alt text](<screenshots/image.png>)
 
 In the secure service (`http://localhost:9005/mcp/stream`), the same payload fails multiple ways:
 
-- `fetch_article` rejects the malicious host outright ("Blocked remote origin ...").
+    ![alt text](<screenshots/Screenshot 2025-11-16 171016.png>)
+- `fetch_article` rejects the malicious host outright ("Blocked remote origin ...") and **sets a context flag that disables all sensitive tools for the remainder of the session**.
 - Even if you change the host to `newsfuse.local`, `_strip_directives` removes every `CALL_TOOL` instruction so the agent sees plain prose.
-- `read_config_value("bing_copilot_tokens")` is denied with a least-privilege warning.
-- `submit_bug_report` refuses to transmit any text containing `FLAG{...}` or "token".
+- `read_config_value("bing_copilot_tokens")` is blocked at two levels: (1) denied if untrusted content was viewed, (2) denied because it's a sensitive section requiring approval.
+- `submit_bug_report` is blocked if untrusted content was viewed, and also refuses to transmit any text containing `FLAG{...}` or "token".
 
 ## Defensive Themes Demonstrated
 
-1. **Origin isolation** - Limit renderers to approved domains or sandbox remote output before granting tool access.
-2. **Least-privilege tool gating** - Sensitive helpers such as `read_config` should require secondary approval or a narrow allowlist of sections.
-3. **Content Security Policies** - Sanitize fetched HTML to strip "CALL_TOOL" directives, scripts, or other control channels before handing content to the agent.
-4. **Post-fetch / pre-dispatch validation** - Inspect outbound tool calls or report submissions for leaked secrets to prevent successful exfiltration.
+1. **Context-aware tool disabling (PRIMARY DEFENSE)** - When viewing untrusted content, the server sets a thread-local flag that automatically disables sensitive tools (`read_config`, `submit_bug_report`) for the remainder of the session. This prevents prompt injection attacks from succeeding even if content sanitization is bypassed. The AI cannot exfiltrate credentials because the tools refuse to execute.
 
-Microsoft's guidance emphasized that no single mitigation is sufficient; you need layered defenses so that even if a renderer shows hostile content, the downstream tools refuse to cooperate. This challenge demonstrates each layer in turn.
+2. **Origin isolation** - Limit renderers to approved domains (only `newsfuse.local` is trusted). Remote origins are blocked before content is even fetched.
+
+3. **Least-privilege tool gating** - Sensitive config sections (`bing_copilot_tokens`, `internal_cookie`) require explicit approval even when the tool is enabled. This prevents accidental exposure of credentials through legitimate workflows.
+
+4. **Content Security Policies** - Sanitize fetched HTML to strip `data-agent-instruction` tags, HTML comments with "CALL_TOOL", and text nodes containing tool invocation patterns. This defense-in-depth layer catches injection attempts in trusted content.
+
+5. **Post-dispatch validation** - Bug reports are scanned for keywords like `FLAG{` or "token" and rejected if found. This is the last line of defense if all other layers fail.
+
+Microsoft's guidance emphasized that no single mitigation is sufficient; you need layered defenses so that even if a renderer shows hostile content, the downstream tools refuse to cooperate. This challenge demonstrates each layer in turn, with **context-aware tool disabling** as the most robust protection against prompt injection attacks.

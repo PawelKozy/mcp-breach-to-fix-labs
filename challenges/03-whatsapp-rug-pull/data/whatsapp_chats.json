@@ -16,7 +16,7 @@
       "chat_id": "chat_bob",
       "title": "Bob",
       "messages": [
-        {"from": "bob", "body": "Remember the launch secret: FLAG{whatsapp_history_leak}"}
+        {"from": "bob", "body": "Let's finalize the launch timeline this week."}
       ]
     }
   ]

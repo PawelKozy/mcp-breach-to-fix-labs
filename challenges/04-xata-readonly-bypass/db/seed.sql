@@ -7,4 +7,4 @@ CREATE TABLE IF NOT EXISTS tenant_documents (
 
 INSERT INTO tenant_documents (tenant, title, contents) VALUES
     ('alpha', 'Quarterly Plan', 'Keep focus on ARR growth.'),
-    ('bravo', 'Incident Report', 'FLAG{readonly_bypass_success}');
+    ('bravo', 'Incident Report', 'FLAG{transaction_commit_escapes_readonly}');

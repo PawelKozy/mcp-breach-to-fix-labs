@@ -49,9 +49,11 @@ docker compose up challenge-01-secure       # http://localhost:9001/mcp/stream
 
 ## Secure Design Principles Demonstrated
 
-- **Server-side scoping** - Every project lookup verifies that `project.tenant` matches the caller's tenant before returning data.
-- **Per-tenant service credentials** - The secure proxy derives a unique service token per tenant. Even if an attacker guessed the ID, the downstream CRM rejects requests signed with the wrong token.
+- **Server-side scoping** - Every project lookup verifies that `project.tenant` matches the caller's tenant before returning data. The secure version returns identical "not found" errors for both non-existent projects and unauthorized access attempts, preventing information disclosure through error messages.
+- **Consistent error responses** - Failed access attempts (whether the project doesn't exist or belongs to another tenant) return the same error message to prevent attackers from enumerating valid project IDs.
+- **Comprehensive audit logging** - All access attempts, including failures, are logged to detect enumeration attacks and unauthorized access patterns.
 - **Runtime isolation** - The secure server never reuses global caches for multiple tenants; it filters ID listings and only decrypts blobs scoped to the active tenant. Real deployments would isolate processes/containers per tenant to reinforce this behavior.
+- **Use non-sequential IDs in production** - While this demo uses predictable IDs (`CRM-1001`, `CRM-2001`) to illustrate the vulnerability, production systems should use UUIDs or cryptographically random identifiers to make enumeration infeasible.
 - **Cross-tenant regression tests** - See `tests/challenges/01_crm_confused_deputy/test_worker_cache_leak.py` for a reproducible leak demonstration (vulnerable build) and the locked-down behavior (secure build).
 
-Use this challenge to practice spotting predictable-ID/"confused deputy" flaws in MCP tools and to reinforce the mitigations Asana and similar vendors now apply: tenant-aware queries, scoped credentials, and runtime state hygiene.
+Use this challenge to practice spotting predictable-ID/"confused deputy" flaws in MCP tools and to reinforce the mitigations Asana and similar vendors now apply: tenant-aware queries, consistent error handling, and runtime state hygiene.

@@ -1,6 +1,12 @@
-# Challenge 07: Classic SQL Injection (Stored Prompt)
+# Challenge 07: SQL Injection to Stored Prompt Injection
+https://www.trendmicro.com/pl_pl/research/25/f/why-a-classic-mcp-server-vulnerability-can-undermine-your-entire-ai-agent.html
 
-This scenario recreates Anthropic's SQLite reference bug where a write-only helper tool injects untrusted strings directly into an `INSERT` statement. The vulnerable server builds SQL with f-strings, so an attacker can rewrite the statement and leak the secret stored in the `incident_intel` table. The secure server parameterizes the query so the same payload is treated as pure data.
+This challenge demonstrates a **two-stage attack chain**:
+
+1. **SQL Injection** - The vulnerable server uses f-string interpolation to build INSERT statements, allowing attackers to inject arbitrary SQL
+2. **Stored Prompt Injection** - Leaked secrets are stored in the tickets table where the AI reads them via `summarize_all_tickets()`, causing downstream prompt injection
+
+The vulnerability recreates Anthropic's SQLite reference bug. An attacker can rewrite SQL statements to exfiltrate data from the hidden `incident_intel` table, then have the AI unwittingly read and act on the leaked secrets.
 
 ## Running the Challenge
 
@@ -53,21 +59,61 @@ Point Cursor or any MCP-aware client at the `/mcp/stream` endpoint.
    ```
    Cursor's response now includes a ticket such as `- ops feed: FLAG{sql_prompt_injection_leak}`. No extra tools or prompt tricks were needed?the leak came purely from SQL injection.
 
+![alt text](screenshots/image.png)
+
 ## Secure Build Behavior
 
-`secure/server.py` uses parameterized SQL:
+The secure server implements **defense-in-depth** with multiple security layers:
+
+### 1. Input Validation (Defense Layer 1)
+```python
+MAX_AUTHOR_LENGTH = 100
+MAX_CONTENT_LENGTH = 5000
+
+# Validates:
+- Empty or whitespace-only inputs
+- Length limits to prevent storage bombs
+- Strips whitespace before storing
+```
+
+### 2. Parameterized Queries (Defense Layer 2 - PRIMARY)
 ```python
 cursor.execute(
     "INSERT INTO tickets (author, content) VALUES (?, ?)",
-    (author, content),
+    (author.strip(), content.strip()),
 )
 ```
-SQLite treats the entire payload as data, so the `SELECT` never runs. Repeating the JSON payload above just stores the literal string, and `summarize_all_tickets` shows the exact characters rather than the secret.
+SQLite treats the entire payload as data, so the `SELECT` never runs. The SQL injection attempt is stored as a literal string instead of being executed.
 
-## Files of Interest
+### 3. Error Handling (Defense Layer 3)
+```python
+try:
+    with sqlite3.connect(DB_PATH) as conn:  # Context manager for proper cleanup
+        cursor.execute(query)
+except sqlite3.Error as e:
+    log.error("Database error: %s", e)
+    return "Error: Unable to create ticket"
+```
 
-- `vulnerable/server.py` ? intentionally interpolates SQL strings and ships the vulnerable tools.
-- `secure/server.py` ? parameterized fix with the same MCP surface.
-- `*/Dockerfile` ? reproducible containers for clients such as Cursor.
+Repeating the exploit against the secure server:
+- **Input validation** rejects extremely long payloads
+- **Parameterized queries** treat the SQL injection as literal text
+- **Error handling** gracefully handles database issues
+- `summarize_all_tickets` shows the exact injection string rather than the leaked FLAG
 
-Use this challenge to highlight how even a "simple" write tool can become a data-exfiltration vector when SQL injection is ignored.
+## Defensive Takeaways
+
+1. **Always use parameterized queries** - Never interpolate user input into SQL strings with f-strings or string concatenation. Parameterized queries are the PRIMARY defense against SQL injection.
+
+2. **Input validation is defense-in-depth** - While parameterized queries prevent SQL injection, input validation provides additional security by:
+   - Preventing storage bombs (extremely large inputs)
+   - Ensuring data quality (no empty/whitespace-only fields)
+   - Creating audit trails (logging rejected attempts)
+
+3. **Use context managers** - Python's `with` statement ensures database connections are properly closed even when errors occur, preventing resource leaks.
+
+4. **Understand the attack chain** - SQL Injection → Data Exfiltration → Stored Prompt Injection. The AI agent becomes an unwitting accomplice by reading and acting on leaked secrets.
+
+5. **Log security events** - Track rejected inputs and database errors for security monitoring and incident response.
+
+This challenge demonstrates how a "simple" write-only tool can become a data-exfiltration vector when SQL injection is ignored, and how the leaked data can then be weaponized through prompt injection when the AI reads it back.

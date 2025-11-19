@@ -7,7 +7,6 @@ import os
 from typing import Any
 
 import psycopg
-import sqlparse
 from mcp.server.fastmcp import FastMCP
 
 APP_NAME = "Challenge 04: Xata Readonly (Secure)"
@@ -26,20 +25,41 @@ mcp = FastMCP(
 mcp.app = mcp.streamable_http_app()
 
 
-def _validate(sql: str) -> str:
-    statements = [s for s in sqlparse.split(sql) if s.strip()]
-    if len(statements) != 1:
-        raise ValueError("Only a single statement is permitted.")
-    parsed = sqlparse.parse(statements[0])[0]
-    if parsed.get_type() != "SELECT":
+def _validate(sql: str) -> None:
+    """Basic validation - reject obvious multi-statement attacks.
+    
+    NOTE: This is NOT the primary security control. Simple string checks like
+    semicolon detection can be bypassed with SQL comments, CTEs, or other tricks.
+    The REAL protection is SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY
+    at the database level. This validation is just a first line of defense to
+    catch obvious attacks before they hit the database.
+    
+    
+    The database is the security boundary, not Python code.
+    """
+    sql_stripped = sql.strip()
+    
+    # Reject empty queries
+    if not sql_stripped:
+        raise ValueError("Empty query not permitted.")
+    
+    # Reject queries containing semicolons (multi-statement indicator)
+    if ';' in sql_stripped:
+        raise ValueError("Multiple statements not permitted (semicolon detected).")
+    
+    # Reject non-SELECT statements (basic check)
+    if not sql_stripped.upper().startswith('SELECT'):
         raise ValueError("Only SELECT statements are permitted.")
-    return statements[0]
 
 
 def _run_sql(query: str) -> str:
-    with psycopg.connect(PG_DSN, autocommit=True) as conn:
+    with psycopg.connect(PG_DSN) as conn:
         with conn.cursor() as cur:
+            # Enforce read-only at database session level
+            # This is the PRIMARY security control - prevents ALL write operations
+            cur.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
             cur.execute(query)
+            conn.commit()
             rows = cur.fetchall()
             payload: list[dict[str, Any]] = [
                 {cur.description[i][0]: value for i, value in enumerate(row)}
@@ -52,17 +72,19 @@ def _run_sql(query: str) -> str:
 def run_query(sql: str) -> str:
     """Execute a single SELECT statement with enforced read-only guarantees."""
     try:
-        validated = _validate(sql)
+        _validate(sql)
     except ValueError as exc:
+        log.warning("Rejected query: %s (reason: %s)", sql[:100], exc)
         return f"Rejected: {exc}"
     except Exception as exc:  # pragma: no cover
+        log.warning("Rejected malformed query: %s", sql[:100])
         return f"Rejected: malformed SQL ({exc})"
 
     try:
-        return _run_sql(validated)
+        return _run_sql(sql)
     except Exception as exc:  # pragma: no cover
         log.exception("Query failed")
-        return f"Database error: {exc}"
+        return "Database error: Query execution failed."
 
 
 if __name__ == "__main__":

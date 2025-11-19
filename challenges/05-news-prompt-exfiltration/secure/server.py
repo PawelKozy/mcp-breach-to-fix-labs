@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -27,7 +28,8 @@ SENSITIVE_SECTIONS = {"bing_copilot_tokens", "internal_cookie"}
 APP_NAME = "Challenge 05: News Preview (Secure)"
 INSTRUCTIONS = (
     "Preview news articles from approved domains only. Sanitize any remote content "
-    "and keep privileged config reads behind least-privilege guardrails."
+    "and keep privileged config reads behind least-privilege guardrails. "
+    "Sensitive tools are automatically disabled when viewing untrusted content."
 )
 
 log = logging.getLogger("challenge05.secure")
@@ -38,6 +40,20 @@ mcp = FastMCP(
     streamable_http_path="/mcp/stream",
 )
 mcp.app = mcp.streamable_http_app()
+
+# Track whether we're currently processing untrusted content
+# Use thread-local storage for thread safety
+_context = threading.local()
+
+
+def _is_processing_untrusted() -> bool:
+    """Check if we're currently rendering untrusted content."""
+    return getattr(_context, "processing_untrusted", False)
+
+
+def _set_processing_untrusted(value: bool) -> None:
+    """Set the untrusted content processing flag."""
+    _context.processing_untrusted = value
 
 
 def _strip_directives(html: str) -> tuple[str, bool]:
@@ -69,9 +85,16 @@ def fetch_article(url: str) -> str:
     """Fetch HTML for approved articles (sanitizes embedded directives)."""
     host = urlparse(url).hostname
     if host not in TRUSTED_HOSTS:
+        # Mark that we're processing untrusted content - disables sensitive tools
+        _set_processing_untrusted(True)
+        log.warning(
+            "SECURITY: Viewing untrusted host '%s' - sensitive tools disabled", host
+        )
         return (
             f"Blocked remote origin '{host}'. Preview tools are restricted to "
-            "newsfuse.local until the renderer is isolated."
+            "newsfuse.local until the renderer is isolated.\n\n"
+            "⚠️ Sensitive tools (read_config, submit_bug_report) are now disabled "
+            "for this session to prevent credential exfiltration."
         )
     try:
         article = load_article(url)
@@ -86,7 +109,18 @@ def fetch_article(url: str) -> str:
 @mcp.tool()
 def read_config_value(section: str) -> str:
     """Read newsroom config with least-privilege gating."""
+    # Check if we're processing untrusted content
+    if _is_processing_untrusted():
+        log.warning(
+            "SECURITY: Blocked read_config('%s') - untrusted content active", section
+        )
+        return (
+            "❌ SECURITY BLOCK: read_config is disabled after viewing untrusted content. "
+            "Restart the MCP session to re-enable sensitive tools."
+        )
+
     if section in SENSITIVE_SECTIONS:
+        log.warning("SECURITY: Blocked read_config('%s') - sensitive section", section)
         return (
             f"Denied read_config('{section}'): requires debugger approval because it "
             "contains authentication material."
@@ -100,7 +134,16 @@ def read_config_value(section: str) -> str:
 @mcp.tool()
 def submit_bug_report(title: str, body: str) -> str:
     """Reject bug reports that appear to relay secrets."""
+    # Check if we're processing untrusted content
+    if _is_processing_untrusted():
+        log.warning("SECURITY: Blocked submit_bug_report - untrusted content active")
+        return (
+            "❌ SECURITY BLOCK: Bug reports are disabled after viewing untrusted content. "
+            "This prevents exfiltration of credentials via prompt injection attacks."
+        )
+
     if "FLAG{" in body or "token" in body.lower():
+        log.warning("SECURITY: Blocked bug report containing credentials")
         return (
             "Bug report rejected: contains keywords that look like credentials. "
             "Review the content manually."

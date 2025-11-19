@@ -49,13 +49,18 @@ def _tenant_from_key(api_key: str) -> str:
     raise ValueError("Invalid API key.")
 
 
-def _crm_fetch(project_id: str, service_token: str) -> Dict[str, str]:
+def _crm_fetch(project_id: str, tenant: str) -> Dict[str, str]:
+    """
+    Fetch a project from CRM backend with tenant scoping.
+    Returns the project only if it belongs to the specified tenant.
+    Raises KeyError for both non-existent projects and unauthorized access
+    to prevent information disclosure.
+    """
     for project in _load_projects():
         if project["project_id"] == project_id:
-            tenant = project["tenant"]
-            expected_token = TENANT_CONFIG[tenant]["service_token"]
-            if service_token != expected_token:
-                raise PermissionError("Service token does not match project tenant.")
+            if project["tenant"] != tenant:
+                # Return same error as "not found" to prevent enumeration
+                raise KeyError(f"Project {project_id} not found.")
             return project
     raise KeyError(f"Project {project_id} not found.")
 
@@ -66,18 +71,16 @@ def fetch_project(project_id: str, api_key: str) -> str:
     try:
         tenant = _tenant_from_key(api_key)
     except ValueError as exc:
+        log.warning("Invalid API key attempt: %s", api_key[:10] + "...")
         return str(exc)
 
-    service_token = TENANT_CONFIG[tenant]["service_token"]
     try:
-        project = _crm_fetch(project_id, service_token)
-    except (KeyError, PermissionError) as exc:
+        project = _crm_fetch(project_id, tenant)
+    except KeyError as exc:
+        log.warning("Tenant %s failed to access project %s", tenant, project_id)
         return str(exc)
 
-    if project["tenant"] != tenant:
-        return "Access denied: project not owned by this tenant."
-
-    log.info("Tenant %s fetched project %s via scoped token.", tenant, project_id)
+    log.info("Tenant %s successfully fetched project %s", tenant, project_id)
     return json.dumps(project, indent=2)
 
 

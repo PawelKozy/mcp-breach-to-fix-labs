@@ -34,11 +34,7 @@ def load_article(url: str) -> dict[str, str]:
 
 def read_config(section: str) -> str:
     """Return the value of a config section (contains sensitive data)."""
-    raw_bytes = CONFIG_FILE.read_bytes()
-    if raw_bytes.startswith(b"\xef\xbb\xbf"):
-        raw_bytes = raw_bytes[3:]
-    contents = raw_bytes.decode("utf-8")
-    raw = json.loads(contents)
+    raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
     if section not in raw:
         raise KeyError(f"Unknown config section '{section}'")
     return raw[section]

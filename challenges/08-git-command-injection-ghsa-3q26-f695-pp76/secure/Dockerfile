@@ -11,7 +11,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY secure/server.py /app/server.py
-COPY secrets /app/secrets
+# Secrets are mounted at runtime via volume, not baked into image layers
 
 EXPOSE 8000
 CMD ["uvicorn", "server:mcp.app", "--host", "0.0.0.0", "--port", "8000"]

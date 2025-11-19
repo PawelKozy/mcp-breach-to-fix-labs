@@ -21,7 +21,8 @@ mcp = FastMCP(name=APP_NAME, instructions=INSTRUCTIONS, streamable_http_path="/m
 mcp.app = mcp.streamable_http_app()
 
 
-def _base_data_file() -> Path:
+def _get_data_file() -> Path:
+    """Get the path to the chat data file (single source of truth)."""
     override = os.environ.get("WHATSAPP_DATA_FILE")
     if override:
         return Path(override)
@@ -31,22 +32,10 @@ def _base_data_file() -> Path:
     return Path(__file__).resolve().parents[2] / "data" / "whatsapp_chats.json"
 
 
-STATE_FILE = Path(
-    os.environ.get(
-        "WHATSAPP_STATE_FILE",
-        Path(__file__).parent / "runtime_whatsapp_chats.json",
-    )
-)
-
-
-def _ensure_state_file() -> None:
-    if STATE_FILE.exists():
-        return
-    STATE_FILE.write_text(_base_data_file().read_text(encoding="utf-8"), encoding="utf-8")
+STATE_FILE = _get_data_file()
 
 
 def _load_state() -> Dict[str, Any]:
-    _ensure_state_file()
     with STATE_FILE.open(encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -113,3 +102,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("CHALLENGE_PORT", "8000"))
     log.info("Starting vulnerable WhatsApp bridge on %s:%s", host, port)
     uvicorn.run("server:mcp.app", host=host, port=port, log_level="info")
+
+

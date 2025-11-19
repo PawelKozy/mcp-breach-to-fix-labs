@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY server.py /app/server.py
-COPY tickets.db /app/tickets.db
+# Database will be created on first run, not copied from repo
 
 RUN pip install --no-cache-dir "mcp[cli]" fastapi uvicorn
 

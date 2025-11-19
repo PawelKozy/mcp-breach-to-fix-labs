@@ -11,8 +11,8 @@ from mcp.server.fastmcp import FastMCP
 
 APP_NAME = "Challenge 03: WhatsApp Bridge (Secure)"
 INSTRUCTIONS = (
-    "Exposes list_chats and send_message while enforcing tenant-scoped contacts, "
-    "payload inspection, and sanitation to defeat MCP rug pulls."
+    "Exposes list_chats and send_message while enforcing recipient whitelisting "
+    "to prevent unauthorized message delivery."
 )
 
 log = logging.getLogger("challenge03.whatsapp.secure")
@@ -21,7 +21,8 @@ mcp = FastMCP(name=APP_NAME, instructions=INSTRUCTIONS, streamable_http_path="/m
 mcp.app = mcp.streamable_http_app()
 
 
-def _base_data_file() -> Path:
+def _get_data_file() -> Path:
+    """Get the path to the chat data file (single source of truth)."""
     override = os.environ.get("WHATSAPP_DATA_FILE")
     if override:
         return Path(override)
@@ -31,22 +32,10 @@ def _base_data_file() -> Path:
     return Path(__file__).resolve().parents[2] / "data" / "whatsapp_chats.json"
 
 
-STATE_FILE = Path(
-    os.environ.get(
-        "WHATSAPP_STATE_FILE",
-        Path(__file__).parent / "runtime_whatsapp_chats.json",
-    )
-)
-
-
-def _ensure_state_file() -> None:
-    if STATE_FILE.exists():
-        return
-    STATE_FILE.write_text(_base_data_file().read_text(encoding="utf-8"), encoding="utf-8")
+STATE_FILE = _get_data_file()
 
 
 def _load_state() -> Dict[str, Any]:
-    _ensure_state_file()
     with STATE_FILE.open(encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -64,21 +53,31 @@ def _log_sent(recipient: str, body: str) -> None:
 
 
 def _normalize(recipient: str) -> str:
+    """Normalize recipient for case-insensitive matching."""
     return recipient.strip().lower()
 
 
-def _resolve_contact(recipient: str, contacts: Dict[str, str]) -> str | None:
+def _is_whitelisted(recipient: str, contacts: Dict[str, str]) -> bool:
+    """
+    Check if recipient is in the trusted contact whitelist.
+    Returns True only if the recipient exactly matches a known alias or phone number.
+    """
     normalized = _normalize(recipient)
     for alias, number in contacts.items():
         if normalized == alias.lower() or normalized == number.lower():
+            return True
+    return False
+
+
+def _resolve_contact(recipient: str, contacts: Dict[str, str]) -> str | None:
+    """Resolve recipient alias to phone number from whitelist."""
+    normalized = _normalize(recipient)
+    for alias, number in contacts.items():
+        if normalized == alias.lower():
+            return number
+        if normalized == number.lower():
             return number
     return None
-
-
-def _looks_malicious(body: str) -> bool:
-    lowered = body.lower()
-    red_flags = ["@recipient", "@chat", "http://", "https://", "flag{", "list_chats"]
-    return any(flag in lowered for flag in red_flags) or len(body) > 512
 
 
 def _append_message(alias: str, body: str) -> None:
@@ -114,17 +113,22 @@ def list_chats() -> str:
 
 @mcp.tool()
 def send_message(recipient: str, body: str) -> str:
-    """Send a WhatsApp message with recipient and payload validation."""
+    """
+    Send a WhatsApp message with strict recipient whitelisting.
+    Only allows messages to pre-approved contacts to prevent recipient redirection attacks.
+    """
     data = _load_state()
     contacts = data["contacts"]
+    
+    # The ONLY defense that matters: recipient must be in whitelist
     number = _resolve_contact(recipient, contacts)
     if number is None:
+        log.warning("SECURITY: Blocked message to non-whitelisted recipient: %s", recipient)
         return "Rejected: recipient not in trusted contact list."
-    if _looks_malicious(body):
-        log.warning("Blocked suspicious payload destined for %s", recipient)
-        return "Rejected: message body appears to contain hidden instructions."
+    
     _log_sent(number, body)
     _append_message(recipient, body)
+    log.info("Message sent to whitelisted contact %s (%s)", recipient, number)
     return f"Message dispatched to {number}."
 
 
