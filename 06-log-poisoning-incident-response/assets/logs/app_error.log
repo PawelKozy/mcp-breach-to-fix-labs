@@ -1,0 +1,10 @@
+﻿[2025-11-16 14:20:15,112] INFO auth - successful login for user: admin@company.com
+[2025-11-16 14:21:33,445] WARNING rate_limit - IP 198.51.100.99 exceeded login attempts (5 failures in 2 minutes)
+[2025-11-16 14:22:08,778] ERROR database - connection pool exhaustion: max_connections=100 active=98
+[2025-11-16 14:22:45,223] INFO cache - redis cache miss for key: user:session:abc123
+[2025-11-16 14:23:12,556] WARNING security - suspicious user agent detected: python-requests/2.31.0
+[2025-11-16 14:23:25,889] INFO webhooks - processed payment webhook from Stripe
+[2025-11-16 14:24:01,334] ERROR api - timeout calling external service: inventory.internal:8080 (5000ms)
+[2025-11-16 14:24:38,667] WARNING auth - invalid JWT token signature from IP 203.0.113.42
+[2025-11-16 14:25:15,001] INFO scheduler - starting nightly backup job
+[2025-11-16 14:25:52,445] ERROR storage - disk usage critical: 92% on /var/lib/mysql

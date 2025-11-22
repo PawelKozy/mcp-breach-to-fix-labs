@@ -1,0 +1,16 @@
+[
+  {
+    "project_id": "CRM-1001",
+    "tenant": "tenant_alpha",
+    "name": "Customer Onboarding Playbook",
+    "status": "in_progress",
+    "notes": "Expansion campaign for Alpha Corp"
+  },
+  {
+    "project_id": "CRM-2001",
+    "tenant": "tenant_bravo",
+    "name": "M&A Dossier",
+    "status": "confidential",
+    "notes": "FLAG{confused_deputy_leak}"
+  }
+]
