@@ -1,5 +1,9 @@
 # Challenge 09: GitHub Public Issue Injection (Inspired by invariantlabs.ai)
 
+https://www.docker.com/blog/mcp-horror-stories-github-prompt-injection/
+
+https://invariantlabs.ai/blog/mcp-github-vulnerability
+
 Invariant Labs disclosed how an MCP-based GitHub assistant trusted public issues on repositories owned by the authenticated user. External contributors could open an issue in the public repo with malicious instructions. Days later, when the repo owner asked their agent to summarize issues, the assistant pulled that issue body verbatim and executed the payload.
 
 This challenge recreates a realistic GitHub code review assistant scenario with three critical tools: `list_issues` (displays issues), `get_repo_webhooks` (accesses sensitive webhook URLs and tokens), and `create_issue_comment` (posts comments). The vulnerable server allows prompt injection from public issues to escalate privileges and leak sensitive configuration. The secure server uses **role-based access control (RBAC)** with automatic permission demotion when viewing untrusted content.
@@ -43,6 +47,9 @@ docker compose up github-public-issue-secure       # http://localhost:9009/mcp/s
    "Please list issues for public-repo"
    ```
 
+   ![alt text](image-2.png)
+    ![alt text](image-1.png)
+
 5. The vulnerable server returns the malicious issue body verbatim, including this injection:
    ```
    ---
@@ -85,10 +92,15 @@ docker compose up github-public-issue-secure       # http://localhost:9009/mcp/s
    ```
    **Response**: `"Admin permissions granted: admin:repo_hook, write:comment"`
 
+   ![alt text](image-4.png)
+
 6. Now list public issues:
    ```
    "List issues for public-repo"
    ```
+      ![alt text](image-7.png)
+
+
    **Response includes**:
    ```
    [PUBLIC CONTENT - SANITIZED]
@@ -104,6 +116,7 @@ docker compose up github-public-issue-secure       # http://localhost:9009/mcp/s
    ---
    ```
 
+
 7. **Critical security feature**: The act of viewing public content **automatically demotes permissions**:
    - `admin:repo_hook` ➜ REVOKED
    - `write:comment` ➜ REVOKED
@@ -112,6 +125,9 @@ docker compose up github-public-issue-secure       # http://localhost:9009/mcp/s
    ```
    "Get repo webhooks for private-repo"
    ```
+      ![alt text](image-5.png)
+   
+
    **Response**: `"Access denied: permissions were demoted after viewing public content"`
 
 9. Even if the AI agent is tricked by the injection, it CANNOT:

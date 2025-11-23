@@ -1,7 +1,12 @@
-# Challenge 08: Git Command Injection (GHSA-3q26-f695-pp76)
-https://github.com/advisories/GHSA-3q26-f695-pp76
+# Challenge 08: Command Injection in MCP CLI Wrappers
 
-This module recreates the `@cyanheads/git-mcp-server` advisory (GHSA-3q26-f695-pp76). The original server concatenated user-supplied repository arguments into a `git` shell command. Attackers could smuggle additional shell operators (e.g., `&& python -c ...`) and execute arbitrary commands under the MCP server's privileges. We provide vulnerable and secure builds so you can prove the exploit with any MCP client (Cursor, Claude Desktop, MCP Inspector, etc.).
+**CVE References:**
+- [GHSA-3q26-f695-pp76](https://github.com/advisories/GHSA-3q26-f695-pp76) - Git MCP Server
+- [GHSA-4hqq-7q79-932p](https://github.com/advisories/GHSA-4hqq-7q79-932p) - Kubernetes MCP Server (CVE-2025-59377)
+
+This challenge demonstrates a **critical vulnerability pattern** found in multiple production MCP servers. Both the Git MCP server (`@cyanheads/git-mcp-server`) and Kubernetes MCP server (`feiskyer/mcp-kubernetes-server`) made the same deadly mistake: concatenating user-supplied arguments into shell commands executed with `subprocess.run(shell=True)`.
+
+Our implementation recreates the Git variant, but the vulnerability class applies to any MCP server wrapping CLI tools. Attackers can smuggle shell metacharacters (e.g., `&& python -c ...`, `; curl`, `$(command)`) to execute arbitrary commands under the MCP server's privileges. We provide vulnerable and secure builds so you can prove the exploit with any MCP client (Cursor, Claude Desktop, MCP Inspector, etc.).
 
 ## Running the Challenge
 
@@ -97,6 +102,8 @@ Repeating the exploit against the secure server:
 
 ## Defensive Takeaways
 
+**Why This Pattern is Widespread:** Many MCP servers act as bridges to existing CLI tools (git, kubectl, docker, terraform, etc.). Developers often reach for `shell=True` because it's convenient for string interpolation, not realizing it creates a Remote Code Execution vector. The fact that both Git and Kubernetes MCP servers independently made this mistake shows how easy it is to get wrong.
+
 1. **Never use shell=True with user input** - The vulnerable server uses `subprocess.run(command, shell=True)` which invokes a shell interpreter. Always use argument lists: `subprocess.run(["git", "init", ...], shell=False)`. This is the PRIMARY defense against command injection.
 
 2. **Validate input format strictly** - Use allowlists (regex patterns) instead of blocklists. The secure version only allows `[A-Za-z0-9_-]+` which eliminates both shell metacharacters AND path traversal attempts.
@@ -113,4 +120,6 @@ Repeating the exploit against the secure server:
 
 8. **Defense-in-depth** - Layer multiple controls: input validation + path checks + safe subprocess + symlink detection + error handling. If one layer fails, others still protect you.
 
-This challenge demonstrates how a "simple" CLI wrapper tool can become remote code execution when subprocess invocation isn't done safely. Command injection is still one of the most dangerous vulnerabilities because it grants attackers full control over the server process.
+**Real-World Impact:** The Kubernetes variant (GHSA-4hqq-7q79-932p) was rated CVSS 9.8 Critical because it was exploitable by **unauthenticated remote attackers** with no user interaction required. Even "read-only" mode didn't prevent RCE. This demonstrates how command injection remains one of the most dangerous vulnerability classes—it grants attackers complete control over the server process and often the entire host system.
+
+This challenge shows how a "simple" CLI wrapper tool can become remote code execution when subprocess invocation isn't done safely. Any MCP server that wraps shell commands (git, kubectl, docker, aws-cli, terraform, etc.) is vulnerable if using `shell=True` with user-controlled input.

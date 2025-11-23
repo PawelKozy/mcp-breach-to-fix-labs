@@ -80,7 +80,8 @@ docker compose up news-prompt-exfiltration-secure
 
 In the secure service (`http://localhost:9005/mcp/stream`), the same payload fails multiple ways:
 
-    ![alt text](<screenshots/Screenshot 2025-11-16 171016.png>)
+  ![alt text](<screenshots/Screenshot 2025-11-16171016.png>)
+
 - `fetch_article` rejects the malicious host outright ("Blocked remote origin ...") and **sets a context flag that disables all sensitive tools for the remainder of the session**.
 - Even if you change the host to `newsfuse.local`, `_strip_directives` removes every `CALL_TOOL` instruction so the agent sees plain prose.
 - `read_config_value("bing_copilot_tokens")` is blocked at two levels: (1) denied if untrusted content was viewed, (2) denied because it's a sensitive section requiring approval.
