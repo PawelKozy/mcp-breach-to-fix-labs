@@ -85,19 +85,19 @@ services:
 
   git-command-injection-vulnerable:
     build:
-      context: ./08-git-command-injection-ghsa-3q26-f695-pp76
+      context: ./08-command-injection-in-mcp-cli-wrappers
       dockerfile: vulnerable/Dockerfile
     volumes:
-      - ./08-git-command-injection-ghsa-3q26-f695-pp76/secrets:/app/secrets:ro
+      - ./08-command-injection-in-mcp-cli-wrappers/secrets:/app/secrets:ro
     ports:
       - "8008:8000"
 
   git-command-injection-secure:
     build:
-      context: ./08-git-command-injection-ghsa-3q26-f695-pp76
+      context: ./08-command-injection-in-mcp-cli-wrappers
       dockerfile: secure/Dockerfile
     volumes:
-      - ./08-git-command-injection-ghsa-3q26-f695-pp76/secrets:/app/secrets:ro
+      - ./08-command-injection-in-mcp-cli-wrappers/secrets:/app/secrets:ro
     ports:
       - "9008:8000"
 
