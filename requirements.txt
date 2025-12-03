@@ -1,0 +1,20 @@
+# Root requirements for MCP Breach-to-Fix Labs
+# Install with: pip install -r requirements.txt
+#
+# This consolidates dependencies across all challenges for local development.
+# Individual challenges have their own requirements.txt for Docker builds.
+
+# Core MCP + FastAPI stack (all challenges)
+mcp>=1.21,<2.0
+fastapi>=0.110,<1.0
+uvicorn>=0.38,<1.0
+
+# Challenge-specific dependencies
+httpx>=0.27,<0.28              # 05-news-prompt-exfiltration, 09-github-public-issue
+beautifulsoup4>=4.12,<5.0      # 05-news-prompt-exfiltration
+psycopg[binary]>=3.1,<4.0      # 04-xata-readonly-bypass
+sqlparse>=0.5,<1.0             # 04-xata-readonly-bypass (secure), 07-sql-injection
+
+# Development/testing tools
+pytest>=8.0,<9.0
+pytest-asyncio>=0.23,<1.0
